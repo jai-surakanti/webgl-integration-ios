@@ -29,6 +29,8 @@ struct WebView: UIViewRepresentable {
         webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         webView.scrollView.contentInsetAdjustmentBehavior = .never
 
+        context.coordinator.webView = webView // 👈 ADD THIS LINE
+
         if let url = URL(string: urlString) {
             webView.load(URLRequest(url: url))
         }
@@ -44,9 +46,27 @@ struct WebView: UIViewRepresentable {
 
     class WebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         var parent: WebView
+        weak var webView: WKWebView?
 
         init(_ parent: WebView) {
             self.parent = parent
+            super.init()
+            NotificationCenter.default.addObserver(self, selector: #selector(appDidEnterBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
+        }
+
+        deinit {
+            NotificationCenter.default.removeObserver(self)
+        }
+
+        @objc func appDidEnterBackground() {
+            print("App moved to background — attempting to pause game...")
+            webView?.evaluateJavaScript("PauseGame();", completionHandler: { result, error in
+                if let error = error {
+                    print("JavaScript error: \(error.localizedDescription)")
+                } else {
+                    print("PauseGame() JS method executed")
+                }
+            })
         }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
